@@ -325,13 +325,13 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 			break;
 		case RLE_ENCAP_ERR_NULL_TRMT:
 		case RLE_ENCAP_ERR_SDU_TOO_BIG:
-			TRACE("========= RLE encapsulation: misuse (%s)\n",
+			TRACE("========= RLE encapsulation: ERROR: misuse (%s)\n",
 			      str_encap_error(ret_encap));
 			status = -1;
 			goto exit;
 		case RLE_ENCAP_ERR:
 		default:
-			TRACE("========= RLE encapsulation: failure\n");
+			TRACE("========= RLE encapsulation: ERROR: failure\n");
 			status = -1;
 			goto exit;
 		}
@@ -424,7 +424,7 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 					/* next FPDU buffer */
 					fpdus_nr++;
 					if (fpdus_nr >= fpdus_max_nr) {
-						TRACE("====== RLE packing: too few FPDU\n");
+						TRACE("====== RLE packing: ERROR: too few FPDU\n");
 						status = -1;
 						goto exit;
 					}
@@ -435,13 +435,13 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 				case RLE_FRAG_ERR_NULL_TRMT:
 				case RLE_FRAG_ERR_INVALID_SIZE:
 				case RLE_FRAG_ERR_CONTEXT_IS_NULL:
-					TRACE("========= RLE fragmentation: misuse (%s)\n",
+					TRACE("========= RLE fragmentation: ERROR: misuse (%s)\n",
 					      str_frag_error(ret_frag));
 					status = -1;
 					goto exit;
 				case RLE_FRAG_ERR:
 				default:
-					TRACE("========= RLE encapsulation: failure\n");
+					TRACE("========= RLE encapsulation: ERROR: failure\n");
 					status = -1;
 					goto exit;
 				}
@@ -476,7 +476,8 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 						/* next FPDU buffer */
 						fpdus_nr++;
 						if (fpdus_nr >= fpdus_max_nr) {
-							TRACE("====== RLE packing: too few FPDU\n");
+							TRACE("====== RLE packing: ERROR: "
+							      "too few FPDU\n");
 							status = -1;
 							goto exit;
 						}
@@ -509,7 +510,7 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 					/* next FPDU buffer */
 					fpdus_nr++;
 					if (fpdus_nr >= fpdus_max_nr) {
-						TRACE("====== RLE packing: too few FPDU\n");
+						TRACE("====== RLE packing: ERROR: too few FPDU\n");
 						status = -1;
 						goto exit;
 					}
@@ -518,13 +519,13 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 					break;
 				case RLE_PACK_ERR_INVALID_LAB:
 				case RLE_PACK_ERR_INVALID_PPDU:
-					TRACE("========= RLE packing: misuse (%s)\n",
+					TRACE("========= RLE packing: ERROR: misuse (%s)\n",
 					      str_pack_error(ret_pack));
 					status = -1;
 					goto exit;
 				case RLE_PACK_ERR:
 				default:
-					TRACE("========= RLE packing: failure\n");
+					TRACE("========= RLE packing: ERROR: failure\n");
 					status = -1;
 					goto exit;
 				}
@@ -579,13 +580,14 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 		case RLE_DECAP_ERR_INV_FPDU:
 		case RLE_DECAP_ERR_INV_PL:
 		case RLE_DECAP_ERR_INV_SDUS:
-			TRACE("====== RLE decapsulation of FPDU #%zu: misuse (%s)\n",
+			TRACE("====== RLE decapsulation of FPDU #%zu: ERROR: misuse (%s)\n",
 			      fpdu_id + 1, str_decap_error(ret_decap));
 			status = -1;
 			goto exit;
 		case RLE_DECAP_ERR:
 		default:
-			TRACE("====== RLE decapsulation of FPDU #%zu: failure\n", fpdu_id + 1);
+			TRACE("====== RLE decapsulation of FPDU #%zu: ERROR: failure\n",
+			      fpdu_id + 1);
 			status = -2;
 			goto exit;
 		}
@@ -609,7 +611,8 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 			                     packets_length[packet_id] - link_len_src,
 			                     sdus_out[pkt_id].buffer,
 			                     sdus_out[pkt_id].size)) {
-				TRACE("====== packet #%zu comparison: failure\n", packet_id + 1);
+				TRACE("====== packet #%zu comparison: ERROR: failure\n",
+				      packet_id + 1);
 				status = 0;
 				goto exit;
 			} else {
@@ -621,7 +624,7 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 
 	/* check that all input packets are decapsulated correctly */
 	if (packet_offset != number_of_packets) {
-		TRACE("====== %zu packets decapsulated in total, but %zu expected\n",
+		TRACE("====== ERROR: %zu packets decapsulated in total, but %zu expected\n",
 		      packet_offset, number_of_packets);
 		status = -2;
 		goto exit;
