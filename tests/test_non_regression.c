@@ -95,8 +95,11 @@ static int include_layer2 = 0;
 /** Whether the application ignores malformed packets or not. */
 static int ignore_malformed = 0;
 
+/** max number of FPDUs to build */
+#define fpdus_max_nr 1000U /* Arbitrarly */
+
 /** Size of PPDU fragment, BURST_SIZE by default. */
-static size_t frag_len = BURST_SIZE;
+static size_t frag_len[fpdus_max_nr] = { BURST_SIZE };
 
 #define TRACE(x ...) \
 	do { \
@@ -119,6 +122,8 @@ int main(int argc, char *argv[])
 {
 	char *src_filename = NULL;
 	int status = 1;
+	size_t frag_len_index = 0;
+	size_t i;
 
 	while (1) {
 		int c;
@@ -155,7 +160,13 @@ int main(int argc, char *argv[])
 		case 'f': /* Fragment Size */
 			assert(optarg != NULL);
 			printf("fragment size with value `%s'\n", optarg);
-			frag_len = atoi(optarg);
+			if (frag_len_index >= fpdus_max_nr) {
+				printf("too many -f options\n");
+				usage();
+				goto error;
+			}
+			frag_len[frag_len_index] = atoi(optarg);
+			frag_len_index++;
 			break;
 		case 'v': /* Version */
 			printf(TEST_VERSION);
@@ -179,6 +190,17 @@ int main(int argc, char *argv[])
 	}
 
 	src_filename = argv[optind];
+
+	/* keep the last fragment length for all remaining fragments */
+	if (frag_len_index == 0) {
+		frag_len[0] = BURST_SIZE;
+		frag_len_index++;
+	}
+	printf("size all FPDUs #%zu - #%u to %zu bytes\n",
+	       frag_len_index + 1, fpdus_max_nr, frag_len[frag_len_index - 1]);
+	for (i = frag_len_index; i < fpdus_max_nr; i++) {
+		frag_len[i] = frag_len[frag_len_index - 1];
+	}
 
 	/* test RLE encap/decap with the packets from the file */
 	status = test_encap_and_decap(src_filename);
@@ -252,7 +274,6 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 	size_t sdus_out_order[number_of_packets];
 	size_t sdus_out_nr = 0;
 
-	const size_t fpdus_max_nr = 1000; /* Arbitrarly */
 	const size_t fpdu_length = 5000; /* Arbitrarly */
 	unsigned char fpdus[fpdus_max_nr][fpdu_length];
 	size_t fpdus_nr = 0;
@@ -307,7 +328,7 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 	}
 
 	fpdu_cur_pos[fpdus_nr] = 0;
-	fpdu_remain_size[fpdus_nr] = frag_len;
+	fpdu_remain_size[fpdus_nr] = frag_len[fpdus_nr];
 	for (pkt_id = 0, frag_id = 0;
 	     pkt_id < number_of_packets;
 	     pkt_id++, frag_id = (frag_id + 1) % RLE_MAX_FRAG_NUMBER) {
@@ -325,13 +346,13 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 			break;
 		case RLE_ENCAP_ERR_NULL_TRMT:
 		case RLE_ENCAP_ERR_SDU_TOO_BIG:
-			TRACE("========= RLE encapsulation: misuse (%s)\n",
+			TRACE("========= RLE encapsulation: ERROR: misuse (%s)\n",
 			      str_encap_error(ret_encap));
 			status = -1;
 			goto exit;
 		case RLE_ENCAP_ERR:
 		default:
-			TRACE("========= RLE encapsulation: failure\n");
+			TRACE("========= RLE encapsulation: ERROR: failure\n");
 			status = -1;
 			goto exit;
 		}
@@ -371,7 +392,7 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 				      "empty the %zu-byte queue (max PPDU fragment = %zu "
 				      "bytes)\n", i, queue_size, fpdu_remain_size[fpdus_nr]);
 
-				if (fpdu_remain_size[fpdus_nr] == frag_len) {
+				if (fpdu_remain_size[fpdus_nr] == frag_len[fpdus_nr]) {
 					ppdu_fragment_max_len =
 						fpdu_remain_size[fpdus_nr] - label_size;
 				} else {
@@ -424,24 +445,24 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 					/* next FPDU buffer */
 					fpdus_nr++;
 					if (fpdus_nr >= fpdus_max_nr) {
-						TRACE("====== RLE packing: too few FPDU\n");
+						TRACE("====== RLE packing: ERROR: too few FPDU\n");
 						status = -1;
 						goto exit;
 					}
 					fpdu_cur_pos[fpdus_nr] = 0;
-					fpdu_remain_size[fpdus_nr] = frag_len;
+					fpdu_remain_size[fpdus_nr] = frag_len[fpdus_nr];
 
 					break;
 				case RLE_FRAG_ERR_NULL_TRMT:
 				case RLE_FRAG_ERR_INVALID_SIZE:
 				case RLE_FRAG_ERR_CONTEXT_IS_NULL:
-					TRACE("========= RLE fragmentation: misuse (%s)\n",
+					TRACE("========= RLE fragmentation: ERROR: misuse (%s)\n",
 					      str_frag_error(ret_frag));
 					status = -1;
 					goto exit;
 				case RLE_FRAG_ERR:
 				default:
-					TRACE("========= RLE encapsulation: failure\n");
+					TRACE("========= RLE encapsulation: ERROR: failure\n");
 					status = -1;
 					goto exit;
 				}
@@ -458,7 +479,8 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 				switch (ret_pack) {
 				case RLE_PACK_OK:
 					TRACE("========= RLE packing: success (%zu-byte FPDU, "
-					      "max %zu bytes)\n", fpdu_cur_pos[fpdus_nr], frag_len);
+					      "max %zu bytes)\n", fpdu_cur_pos[fpdus_nr],
+					      frag_len[fpdus_nr]);
 
 					if (fpdu_remain_size[fpdus_nr] == 0) {
 						TRACE("========= RLE packing: FPDU is full, "
@@ -476,12 +498,13 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 						/* next FPDU buffer */
 						fpdus_nr++;
 						if (fpdus_nr >= fpdus_max_nr) {
-							TRACE("====== RLE packing: too few FPDU\n");
+							TRACE("====== RLE packing: ERROR: "
+							      "too few FPDU\n");
 							status = -1;
 							goto exit;
 						}
 						fpdu_cur_pos[fpdus_nr] = 0;
-						fpdu_remain_size[fpdus_nr] = frag_len;
+						fpdu_remain_size[fpdus_nr] = frag_len[fpdus_nr];
 					}
 					break;
 				case RLE_PACK_ERR_FPDU_TOO_SMALL:
@@ -509,22 +532,22 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 					/* next FPDU buffer */
 					fpdus_nr++;
 					if (fpdus_nr >= fpdus_max_nr) {
-						TRACE("====== RLE packing: too few FPDU\n");
+						TRACE("====== RLE packing: ERROR: too few FPDU\n");
 						status = -1;
 						goto exit;
 					}
 					fpdu_cur_pos[fpdus_nr] = 0;
-					fpdu_remain_size[fpdus_nr] = frag_len;
+					fpdu_remain_size[fpdus_nr] = frag_len[fpdus_nr];
 					break;
 				case RLE_PACK_ERR_INVALID_LAB:
 				case RLE_PACK_ERR_INVALID_PPDU:
-					TRACE("========= RLE packing: misuse (%s)\n",
+					TRACE("========= RLE packing: ERROR: misuse (%s)\n",
 					      str_pack_error(ret_pack));
 					status = -1;
 					goto exit;
 				case RLE_PACK_ERR:
 				default:
-					TRACE("========= RLE packing: failure\n");
+					TRACE("========= RLE packing: ERROR: failure\n");
 					status = -1;
 					goto exit;
 				}
@@ -568,7 +591,7 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 		      "sdus_max_nr = %zu, sdus_nr = %p)\n", fpdu_id + 1, sdus_out,
 		      number_of_packets, &sdus_nr);
 		ret_decap =
-			rle_decapsulate(receiver, fpdus[fpdu_id], frag_len, sdus_out,
+			rle_decapsulate(receiver, fpdus[fpdu_id], frag_len[fpdu_id], sdus_out,
 			                number_of_packets, &sdus_nr, label_out, label_size);
 		switch (ret_decap) {
 		case RLE_DECAP_OK:
@@ -579,13 +602,14 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 		case RLE_DECAP_ERR_INV_FPDU:
 		case RLE_DECAP_ERR_INV_PL:
 		case RLE_DECAP_ERR_INV_SDUS:
-			TRACE("====== RLE decapsulation of FPDU #%zu: misuse (%s)\n",
+			TRACE("====== RLE decapsulation of FPDU #%zu: ERROR: misuse (%s)\n",
 			      fpdu_id + 1, str_decap_error(ret_decap));
 			status = -1;
 			goto exit;
 		case RLE_DECAP_ERR:
 		default:
-			TRACE("====== RLE decapsulation of FPDU #%zu: failure\n", fpdu_id + 1);
+			TRACE("====== RLE decapsulation of FPDU #%zu: ERROR: failure\n",
+			      fpdu_id + 1);
 			status = -2;
 			goto exit;
 		}
@@ -609,7 +633,8 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 			                     packets_length[packet_id] - link_len_src,
 			                     sdus_out[pkt_id].buffer,
 			                     sdus_out[pkt_id].size)) {
-				TRACE("====== packet #%zu comparison: failure\n", packet_id + 1);
+				TRACE("====== packet #%zu comparison: ERROR: failure\n",
+				      packet_id + 1);
 				status = 0;
 				goto exit;
 			} else {
@@ -621,7 +646,7 @@ static int encap_decap(struct rle_transmitter *const transmitter,
 
 	/* check that all input packets are decapsulated correctly */
 	if (packet_offset != number_of_packets) {
-		TRACE("====== %zu packets decapsulated in total, but %zu expected\n",
+		TRACE("====== ERROR: %zu packets decapsulated in total, but %zu expected\n",
 		      packet_offset, number_of_packets);
 		status = -2;
 		goto exit;

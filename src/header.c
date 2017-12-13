@@ -461,13 +461,28 @@ bool push_ppdu_hdr(struct rle_frag_buf *const frag_buf,
                    const size_t ppdu_len,
                    struct rle_ctx_mngt *const rle_ctx)
 {
+	const size_t ppdu_base_hdr_len = 2;
+	const size_t ppdu_std_max_len = RLE_MAX_PPDU_PL_SIZE + ppdu_base_hdr_len;
 	size_t max_alpdu_frag_len = ppdu_len;
 	const size_t remain_alpdu_len = frag_buf_get_remaining_alpdu_length(frag_buf);
 	const bool use_alpdu_crc =
 		(rle_conf->allow_alpdu_sequence_number ? false : !!rle_conf->allow_alpdu_crc);
 
+	RLE_DEBUG("build one PPDU (%zu bytes max) with %zu remaining bytes of ALPDU",
+	          ppdu_len, remain_alpdu_len);
+
+	/* do not put more PPDU bytes than allowed by the standard, ie. length
+	 * stored on 11 bits + 2 bytes of base header = 2047+2 = 2049 */
+	if (max_alpdu_frag_len > ppdu_std_max_len) {
+		RLE_DEBUG("do not build one %zu-byte PPDU, larger than the max "
+		          "%zu bytes defined by RLE standard", max_alpdu_frag_len,
+		          ppdu_std_max_len);
+		max_alpdu_frag_len = ppdu_std_max_len;
+	}
+
 	if (frag_buf_is_fragmented(frag_buf)) {
 		/* ALPDU is fragmented, use CONT or END PPDU */
+		RLE_DEBUG("ALPDU was already fragmented, build one CONT or END PPDU");
 
 		/* RLE context needed if ALPDU is fragmented */
 		assert(rle_ctx != NULL);
@@ -493,12 +508,14 @@ bool push_ppdu_hdr(struct rle_frag_buf *const frag_buf,
 		if (remain_alpdu_len <= max_alpdu_frag_len) {
 			/* END PPDU is possible: put all remaining bytes into the PPDU payload, then build
 			 * the END PPDU header before the payload */
+			RLE_DEBUG("build one END PPDU");
 			frag_buf_ppdu_put(frag_buf, remain_alpdu_len);
 			push_end_ppdu_hdr(frag_buf, rle_ctx->frag_id);
 		} else {
 			/* CONT PPDU is required: determine whether the trailer is fully contained in the
 			 * next PPDU fragment or not ; if not, the trailer would be fragmented, so make
 			 * the CONT PPDU fragment smaller to avoid the trailer fragmentation */
+			RLE_DEBUG("build one CONT PPDU");
 
 			const size_t trailer_len = (use_alpdu_crc ? RLE_CRC_SIZE : 0);
 			const size_t alpdu_overflow_len = remain_alpdu_len - max_alpdu_frag_len;
@@ -533,10 +550,11 @@ bool push_ppdu_hdr(struct rle_frag_buf *const frag_buf,
 			get_alpdu_label_type(frag_buf->sdu_info.protocol_type, ptype_suppressed,
 			                     rle_conf->type_0_alpdu_label_size);
 
-		max_alpdu_frag_len -= sizeof(rle_ppdu_hdr_comp_t);
+		RLE_DEBUG("ALPDU was not fragmented yet, build one COMP or START PPDU");
 
-		if (remain_alpdu_len > max_alpdu_frag_len) {
+		if (remain_alpdu_len + sizeof(rle_ppdu_hdr_comp_t) > max_alpdu_frag_len) {
 			/* Start PPDU */
+			RLE_DEBUG("build one START PPDU");
 
 			const size_t ppdu_and_alpdu_hdrs_len =
 				sizeof(rle_ppdu_hdr_start_t) + frag_buf_get_alpdu_hdr_len(frag_buf);
@@ -547,27 +565,30 @@ bool push_ppdu_hdr(struct rle_frag_buf *const frag_buf,
 				goto error;
 			}
 
-			if (ppdu_len < (ppdu_and_alpdu_hdrs_len + 1)) {
+			if (max_alpdu_frag_len < (ppdu_and_alpdu_hdrs_len + 1)) {
 				/* buffer is too small for the smallest PPDU START fragment: the buffer shall be large
 				 * enough for the PPDU START header, the full ALPDU header and at least one byte of
 				 * ALPDU because the fragmentation of the ALPDU header is not supported by the RLE
 				 * reassembler yet */
 				goto error;
 			}
+			max_alpdu_frag_len -= sizeof(rle_ppdu_hdr_start_t);
 
 			push_alpdu_trailer(frag_buf, rle_conf, rle_ctx);
 
-			frag_buf_ppdu_put(frag_buf, ppdu_len - sizeof(rle_ppdu_hdr_start_t));
+			frag_buf_ppdu_put(frag_buf, max_alpdu_frag_len);
 
 			push_start_ppdu_hdr(frag_buf, rle_ctx->frag_id, alpdu_label_type,
 			                    ptype_suppressed, use_alpdu_crc);
 		} else {
 			/* Complete PPDU */
-			if (ppdu_len < sizeof(rle_ppdu_hdr_comp_t)) {
+			RLE_DEBUG("build one COMP PPDU");
+			if (max_alpdu_frag_len < sizeof(rle_ppdu_hdr_comp_t)) {
 				goto error;
 			}
+			max_alpdu_frag_len -= sizeof(rle_ppdu_hdr_comp_t);
 
-			frag_buf_ppdu_put(frag_buf, ppdu_len - sizeof(rle_ppdu_hdr_comp_t));
+			frag_buf_ppdu_put(frag_buf, max_alpdu_frag_len);
 
 			push_comp_ppdu_hdr(frag_buf, alpdu_label_type, ptype_suppressed);
 		}

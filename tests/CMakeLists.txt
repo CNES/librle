@@ -135,6 +135,19 @@ ADD_TEST(NAME non_regression_sdu_small_fragments_layer2
          COMMAND ${SCRIPT_DIR}/on_all_pcap.sh ${CMAKE_BINARY_DIR}/tests/test_non_regression
                                               ${SAMPLE_DIR}/non_reg -f 11 --include-layer2)
 
+ADD_TEST(NAME non_regression_sdu_too_large_ppdu_comp
+         COMMAND ${CMAKE_BINARY_DIR}/tests/test_non_regression
+                 -f 5000 ${SAMPLE_DIR}/ipv4/4088.pcap)
+ADD_TEST(NAME non_regression_sdu_too_large_ppdu_start
+         COMMAND ${CMAKE_BINARY_DIR}/tests/test_non_regression
+                 -f 3000 ${SAMPLE_DIR}/ipv4/4088.pcap)
+ADD_TEST(NAME non_regression_sdu_too_large_ppdu_cont
+         COMMAND ${CMAKE_BINARY_DIR}/tests/test_non_regression
+                 -f 1000 -f 3000 ${SAMPLE_DIR}/ipv4/4088.pcap)
+ADD_TEST(NAME non_regression_sdu_too_large_ppdu_end
+         COMMAND ${CMAKE_BINARY_DIR}/tests/test_non_regression
+                 -f 2000 -f 3000 ${SAMPLE_DIR}/ipv4/4088.pcap)
+
 ADD_TEST(NAME non_regression_sdu_fuzzing
          COMMAND ${SCRIPT_DIR}/on_all_pcap.sh ${CMAKE_BINARY_DIR}/tests/test_non_regression
                                               ${SAMPLE_DIR}/fuzzing
