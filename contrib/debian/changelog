@@ -1,3 +1,9 @@
+librle (1.7.3) xenial; urgency=medium
+
+  * Release 1.7.3
+
+ -- OpenSAND Maintainers <admin@opensand.org>  Wed, 1 Jun 2022 10:31:12 +0200
+
 librle (1.7.2) xenial; urgency=medium
 
   * Release 1.7.2
