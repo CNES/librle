@@ -20,8 +20,7 @@
 # dh_make generated override targets
 # This is example for Cmake (See https://bugs.debian.org/641051 )
 override_dh_auto_configure:
-#       dh_auto_configure -- #  -DCMAKE_LIBRARY_PATH=$(DEB_HOST_MULTIARCH)
 	dh_auto_configure -- -DCMAKE_INSTALL_PREFIX=/usr/ -DBUILD_TESTS=OFF -Wno-dev
 
 override_dh_strip:
-	dh_strip --dbg-package=librle-dbg
+	dh_strip --dbgsym-migration='librle-dbg (<< 1.7.4~)'
