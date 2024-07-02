@@ -69,6 +69,10 @@ if [ -n "${DIRTY}" ]; then
     RELEASE+=".dirty"
 fi
 
+# Force version from VERSION file to make it consistent accross all branches
+THIS_DIR="$(dirname "$(readlink -e "$0")")"
+VERSION=$( cat "$THIS_DIR"/VERSION )
+
 #
 # Output
 #
