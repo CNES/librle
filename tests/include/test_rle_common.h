@@ -56,7 +56,7 @@
  * Sufficient for encap, frag and pack, but IP header checking in decap might need to modify some
  * of the first octets.
  */
-const unsigned char payload_initializer[5000];
+extern const unsigned char payload_initializer[5000];
 
 /*--  Common  --*/
 

@@ -153,7 +153,7 @@ static enum check_frag_status test_check_frag_transition(const enum frag_states 
 
 enum frag_states test_get_fragment_type(const unsigned char ppdu_first_octet)
 {
-	enum frag_states fragment_type = RLE_PDU_COMPLETE;
+	enum frag_states fragment_type;
 
 	if (ppdu_first_octet & 0x80) {
 		if (ppdu_first_octet & 0x40) {

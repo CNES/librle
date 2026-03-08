@@ -223,12 +223,11 @@ int main(int argc, char *argv[])
 			if (output != NULL) {
 				free(output); /* in case option is given twice */
 			}
-			output = calloc(strlen(optarg) + 1, sizeof(char));
+			output = strdup(optarg);
 			if (output == NULL) {
 				printf("ERROR: Unable to allocate output filename.\n");
 				goto error;
 			}
-			strncpy(output, optarg, strlen(optarg) + 1);
 			break;
 
 		case 'v': /* Version */
@@ -265,12 +264,11 @@ int main(int argc, char *argv[])
 
 	/* If output is not set, setting it to default value. */
 	if (output == NULL) {
-		output = calloc(strlen(DEFAULT_OUTPUT) + 1, sizeof(char));
+		output = strdup(DEFAULT_OUTPUT);
 		if (output == NULL) {
 			printf("ERROR: Unable to allocate output filename.\n");
 			goto error;
 		}
-		strncpy(output, DEFAULT_OUTPUT, strlen(DEFAULT_OUTPUT) + 1);
 	}
 
 	signal(SIGINT, test_interrupt);
