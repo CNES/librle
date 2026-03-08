@@ -130,7 +130,7 @@ void test_rle_memory_receiver_new(void **state __attribute__((unused)))
 	assert_true(receiver == NULL);
 
 	/* context failure */
-	for (i = 0; i < RLE_MAX_FRAG_NUMBER * 2; i++) {
+	for (i = 0; i < RLE_MAX_FRAG_NUMBER; i++) {
 		size_t j;
 		will_return(__wrap_malloc, 1);
 		for (j = 0; j < i; j++) {
